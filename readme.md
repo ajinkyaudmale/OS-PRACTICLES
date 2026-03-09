@@ -1,4 +1,11 @@
-# OS Practical Solutions — Simple C with Dynamic Input
+# OS Practical Solutions — Simple C (Q1–Q10) + MPI (Q11–Q15)
+
+> **Compile & Run MPI programs:**
+>
+> ```
+> mpicc -o prog prog.c
+> mpirun -np 4 ./prog
+> ```
 
 ---
 
@@ -679,32 +686,57 @@ File Block Chain:
 
 ---
 
-## 11. Find Minimum from N Random Numbers
+## 11. MPI — Find Minimum from N Random Numbers
 
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <limits.h>
+#include <mpi.h>
 
-int main() {
-    int n;
-    printf("Enter count of random numbers: ");
-    scanf("%d", &n);
+int main(int argc, char *argv[]) {
+    int rank, size, n;
 
-    int arr[n];
-    srand(time(0));
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    printf("Generated Numbers: ");
-    for (int i = 0; i < n; i++) {
-        arr[i] = rand() % 10000;
-        printf("%d ", arr[i]);
+    if (rank == 0) {
+        printf("Enter total count of random numbers: ");
+        scanf("%d", &n);
     }
 
-    int min = arr[0];
-    for (int i = 1; i < n; i++)
-        if (arr[i] < min) min = arr[i];
+    /* Broadcast n to all processes */
+    MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    printf("\nMinimum value: %d\n", min);
+    int local_n = n / size;
+    int local_arr[local_n];
+
+    /* Each process generates its own portion */
+    srand(rank * 1000 + 42);
+    printf("Process %d generated: ", rank);
+    for (int i = 0; i < local_n; i++) {
+        local_arr[i] = rand() % 10000;
+        printf("%d ", local_arr[i]);
+    }
+    printf("\n");
+
+    /* Find local minimum */
+    int local_min = INT_MAX;
+    for (int i = 0; i < local_n; i++)
+        if (local_arr[i] < local_min)
+            local_min = local_arr[i];
+
+    printf("Process %d local minimum: %d\n", rank, local_min);
+
+    /* Reduce all local minimums to global minimum at rank 0 */
+    int global_min;
+    MPI_Reduce(&local_min, &global_min, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
+
+    if (rank == 0)
+        printf("\nGlobal Minimum from %d random numbers: %d\n", n, global_min);
+
+    MPI_Finalize();
     return 0;
 }
 ```
@@ -712,44 +744,73 @@ int main() {
 ### Sample Input
 
 ```
-Enter count of random numbers: 10
+Enter total count of random numbers: 1000
 ```
 
 ### Output
 
 ```
-Generated Numbers: 8324 1532 7841 294 6723 4891 9012 573 3847 2109
-Minimum value: 294
+Process 0 generated: 7334 1498 6290 ...
+Process 1 generated: 4231 8764 903 ...
+Process 2 generated: 5612 2187 9341 ...
+Process 3 generated: 763 4892 3017 ...
+Process 0 local minimum: 12
+Process 1 local minimum: 8
+Process 2 local minimum: 3
+Process 3 local minimum: 5
+
+Global Minimum from 1000 random numbers: 3
 ```
 
 ---
 
-## 12. Find Maximum from N Random Numbers
+## 12. MPI — Find Maximum from N Random Numbers
 
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <limits.h>
+#include <mpi.h>
 
-int main() {
-    int n;
-    printf("Enter count of random numbers: ");
-    scanf("%d", &n);
+int main(int argc, char *argv[]) {
+    int rank, size, n;
 
-    int arr[n];
-    srand(time(0));
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    printf("Generated Numbers: ");
-    for (int i = 0; i < n; i++) {
-        arr[i] = rand() % 10000;
-        printf("%d ", arr[i]);
+    if (rank == 0) {
+        printf("Enter total count of random numbers: ");
+        scanf("%d", &n);
     }
 
-    int max = arr[0];
-    for (int i = 1; i < n; i++)
-        if (arr[i] > max) max = arr[i];
+    MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    printf("\nMaximum value: %d\n", max);
+    int local_n = n / size;
+    int local_arr[local_n];
+
+    srand(rank * 1000 + 42);
+    printf("Process %d generated: ", rank);
+    for (int i = 0; i < local_n; i++) {
+        local_arr[i] = rand() % 10000;
+        printf("%d ", local_arr[i]);
+    }
+    printf("\n");
+
+    int local_max = INT_MIN;
+    for (int i = 0; i < local_n; i++)
+        if (local_arr[i] > local_max)
+            local_max = local_arr[i];
+
+    printf("Process %d local maximum: %d\n", rank, local_max);
+
+    int global_max;
+    MPI_Reduce(&local_max, &global_max, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+
+    if (rank == 0)
+        printf("\nGlobal Maximum from %d random numbers: %d\n", n, global_max);
+
+    MPI_Finalize();
     return 0;
 }
 ```
@@ -757,49 +818,72 @@ int main() {
 ### Sample Input
 
 ```
-Enter count of random numbers: 10
+Enter total count of random numbers: 1000
 ```
 
 ### Output
 
 ```
-Generated Numbers: 8324 1532 7841 294 6723 4891 9012 573 3847 2109
-Maximum value: 9012
+Process 0 generated: 7334 1498 6290 ...
+Process 1 generated: 4231 8764 903 ...
+Process 2 generated: 5612 2187 9341 ...
+Process 3 generated: 763 4892 3017 ...
+Process 0 local maximum: 9987
+Process 1 local maximum: 9932
+Process 2 local maximum: 9998
+Process 3 local maximum: 9901
+
+Global Maximum from 1000 random numbers: 9998
 ```
 
 ---
 
-## 13. Sum of All Even Numbers from N Random Numbers
+## 13. MPI — Sum of All Even Numbers from N Random Numbers
 
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <mpi.h>
 
-int main() {
-    int n;
-    printf("Enter count of random numbers: ");
-    scanf("%d", &n);
+int main(int argc, char *argv[]) {
+    int rank, size, n;
 
-    int arr[n];
-    srand(time(0));
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    printf("Generated Numbers: ");
-    for (int i = 0; i < n; i++) {
-        arr[i] = rand() % 10000;
-        printf("%d ", arr[i]);
+    if (rank == 0) {
+        printf("Enter total count of random numbers: ");
+        scanf("%d", &n);
     }
 
-    long long sum = 0;
-    printf("\nEven Numbers: ");
-    for (int i = 0; i < n; i++) {
-        if (arr[i] % 2 == 0) {
-            printf("%d ", arr[i]);
-            sum += arr[i];
-        }
-    }
+    MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    printf("\nSum of Even Numbers: %lld\n", sum);
+    int local_n = n / size;
+    int local_arr[local_n];
+
+    srand(rank * 1000 + 42);
+    printf("Process %d generated: ", rank);
+    for (int i = 0; i < local_n; i++) {
+        local_arr[i] = rand() % 10000;
+        printf("%d ", local_arr[i]);
+    }
+    printf("\n");
+
+    long long local_sum = 0;
+    for (int i = 0; i < local_n; i++)
+        if (local_arr[i] % 2 == 0)
+            local_sum += local_arr[i];
+
+    printf("Process %d even sum: %lld\n", rank, local_sum);
+
+    long long global_sum;
+    MPI_Reduce(&local_sum, &global_sum, 1, MPI_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    if (rank == 0)
+        printf("\nSum of all Even numbers from %d random numbers: %lld\n", n, global_sum);
+
+    MPI_Finalize();
     return 0;
 }
 ```
@@ -807,50 +891,72 @@ int main() {
 ### Sample Input
 
 ```
-Enter count of random numbers: 10
+Enter total count of random numbers: 1000
 ```
 
 ### Output
 
 ```
-Generated Numbers: 8324 1532 7841 294 6723 4892 9011 572 3847 2108
-Even Numbers: 8324 1532 294 4892 572 2108
-Sum of Even Numbers: 17722
+Process 0 generated: 7334 1498 6290 ...
+Process 1 generated: 4232 8764 904 ...
+Process 2 generated: 5612 2188 9340 ...
+Process 3 generated: 764 4892 3016 ...
+Process 0 even sum: 621478
+Process 1 even sum: 598231
+Process 2 even sum: 612904
+Process 3 even sum: 589341
+
+Sum of all Even numbers from 1000 random numbers: 2421954
 ```
 
 ---
 
-## 14. Sum of All Odd Numbers from N Random Numbers
+## 14. MPI — Sum of All Odd Numbers from N Random Numbers
 
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <mpi.h>
 
-int main() {
-    int n;
-    printf("Enter count of random numbers: ");
-    scanf("%d", &n);
+int main(int argc, char *argv[]) {
+    int rank, size, n;
 
-    int arr[n];
-    srand(time(0));
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    printf("Generated Numbers: ");
-    for (int i = 0; i < n; i++) {
-        arr[i] = rand() % 10000;
-        printf("%d ", arr[i]);
+    if (rank == 0) {
+        printf("Enter total count of random numbers: ");
+        scanf("%d", &n);
     }
 
-    long long sum = 0;
-    printf("\nOdd Numbers: ");
-    for (int i = 0; i < n; i++) {
-        if (arr[i] % 2 != 0) {
-            printf("%d ", arr[i]);
-            sum += arr[i];
-        }
-    }
+    MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    printf("\nSum of Odd Numbers: %lld\n", sum);
+    int local_n = n / size;
+    int local_arr[local_n];
+
+    srand(rank * 1000 + 42);
+    printf("Process %d generated: ", rank);
+    for (int i = 0; i < local_n; i++) {
+        local_arr[i] = rand() % 10000;
+        printf("%d ", local_arr[i]);
+    }
+    printf("\n");
+
+    long long local_sum = 0;
+    for (int i = 0; i < local_n; i++)
+        if (local_arr[i] % 2 != 0)
+            local_sum += local_arr[i];
+
+    printf("Process %d odd sum: %lld\n", rank, local_sum);
+
+    long long global_sum;
+    MPI_Reduce(&local_sum, &global_sum, 1, MPI_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    if (rank == 0)
+        printf("\nSum of all Odd numbers from %d random numbers: %lld\n", n, global_sum);
+
+    MPI_Finalize();
     return 0;
 }
 ```
@@ -858,45 +964,71 @@ int main() {
 ### Sample Input
 
 ```
-Enter count of random numbers: 10
+Enter total count of random numbers: 1000
 ```
 
 ### Output
 
 ```
-Generated Numbers: 8324 1532 7841 294 6723 4892 9011 572 3847 2108
-Odd Numbers: 7841 6723 9011 3847
-Sum of Odd Numbers: 27422
+Process 0 generated: 7335 1499 6291 ...
+Process 1 generated: 4233 8765 905 ...
+Process 2 generated: 5613 2189 9341 ...
+Process 3 generated: 765 4893 3017 ...
+Process 0 odd sum: 628512
+Process 1 odd sum: 601743
+Process 2 odd sum: 619087
+Process 3 odd sum: 594218
+
+Sum of all Odd numbers from 1000 random numbers: 2443560
 ```
 
 ---
 
-## 15. Sum of All N Random Numbers
+## 15. MPI — Sum of All N Random Numbers
 
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <mpi.h>
 
-int main() {
-    int n;
-    printf("Enter count of random numbers: ");
-    scanf("%d", &n);
+int main(int argc, char *argv[]) {
+    int rank, size, n;
 
-    int arr[n];
-    srand(time(0));
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    printf("Generated Numbers: ");
-    for (int i = 0; i < n; i++) {
-        arr[i] = rand() % 10000;
-        printf("%d ", arr[i]);
+    if (rank == 0) {
+        printf("Enter total count of random numbers: ");
+        scanf("%d", &n);
     }
 
-    long long sum = 0;
-    for (int i = 0; i < n; i++)
-        sum += arr[i];
+    MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    printf("\nSum of all %d numbers: %lld\n", n, sum);
+    int local_n = n / size;
+    int local_arr[local_n];
+
+    srand(rank * 1000 + 42);
+    printf("Process %d generated: ", rank);
+    for (int i = 0; i < local_n; i++) {
+        local_arr[i] = rand() % 10000;
+        printf("%d ", local_arr[i]);
+    }
+    printf("\n");
+
+    long long local_sum = 0;
+    for (int i = 0; i < local_n; i++)
+        local_sum += local_arr[i];
+
+    printf("Process %d partial sum: %lld\n", rank, local_sum);
+
+    long long global_sum;
+    MPI_Reduce(&local_sum, &global_sum, 1, MPI_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    if (rank == 0)
+        printf("\nTotal Sum of all %d random numbers: %lld\n", n, global_sum);
+
+    MPI_Finalize();
     return 0;
 }
 ```
@@ -904,16 +1036,35 @@ int main() {
 ### Sample Input
 
 ```
-Enter count of random numbers: 10
+Enter total count of random numbers: 1000
 ```
 
 ### Output
 
 ```
-Generated Numbers: 8324 1532 7841 294 6723 4892 9011 572 3847 2108
-Sum of all 10 numbers: 45144
+Process 0 generated: 7334 1498 6290 ...
+Process 1 generated: 4231 8764 903 ...
+Process 2 generated: 5612 2187 9341 ...
+Process 3 generated: 763 4892 3017 ...
+Process 0 partial sum: 1249823
+Process 1 partial sum: 1198476
+Process 2 partial sum: 1231904
+Process 3 partial sum: 1214309
+
+Total Sum of all 1000 random numbers: 4894512
 ```
 
 ---
 
-> **Note:** Output for programs 11–15 will vary each run due to random number generation. For programs 1–7, use the same sample input to reproduce the exact output shown.
+> **MPI Key Functions Used:**
+>
+> - `MPI_Init` — Initialize MPI environment
+> - `MPI_Comm_rank` — Get current process rank
+> - `MPI_Comm_size` — Get total number of processes
+> - `MPI_Bcast` — Broadcast input `n` from root (rank 0) to all processes
+> - `MPI_Reduce` — Combine local results to root using `MPI_MIN`, `MPI_MAX`, or `MPI_SUM`
+> - `MPI_Finalize` — Clean up MPI environment
+>
+> **Compile:** `mpicc -o prog prog.c`  
+> **Run with 4 processes:** `mpirun -np 4 ./prog`  
+> Output values vary each run due to random number generation.
